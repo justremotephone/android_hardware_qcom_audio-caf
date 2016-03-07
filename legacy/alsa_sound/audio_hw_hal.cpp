@@ -25,7 +25,9 @@
 #include <system/audio.h>
 #include <hardware/audio.h>
 
-#include <hardware/audio_amplifier.h>
+#ifdef USES_AUDIO_AMPLIFIER
+#include <audio_amplifier.h>
+#endif
 
 #include <hardware_legacy/AudioHardwareInterface.h>
 #include <hardware_legacy/AudioSystemLegacy.h>
@@ -46,8 +48,6 @@ struct qcom_audio_device {
     struct audio_hw_device device;
 
     struct AudioHardwareInterface *hwif;
-
-    amplifier_device_t *amp;
 };
 
 struct qcom_stream_out {
@@ -151,119 +151,6 @@ static uint32_t convert_audio_device(uint32_t from_device, int from_rev, int to_
     return to_device;
 }
 
-static amplifier_device_t * get_amplifier_device(void)
-{
-    int rc;
-    amplifier_module_t *module;
-
-    if (qadev->amp)
-        return qadev->amp;
-
-    rc = hw_get_module(AMPLIFIER_HARDWARE_MODULE_ID,
-            (const hw_module_t **) &module);
-    if (rc) {
-        ALOGV("%s: Failed to obtain reference to amplifier module: %s\n",
-                __func__, strerror(-rc));
-        return NULL;
-    }
-
-    rc = amplifier_device_open((const hw_module_t *) module, &qadev->amp);
-    if (rc) {
-        ALOGV("%s: Failed to open amplifier hardware device: %s\n",
-                __func__, strerror(-rc));
-        return NULL;
-    }
-
-    return qadev->amp;
-}
-
-static int amplifier_open(void)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-
-    if (!amp) {
-        return -ENODEV;
-    }
-
-    return 0;
-}
-
-/* Must expose for ALSADevice.cpp */
-int amplifier_set_input_devices(uint32_t devices)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->set_input_devices) {
-        amp->set_input_devices(amp, devices);
-    }
-
-    return 0;
-}
-
-int amplifier_set_output_devices(uint32_t devices)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->set_output_devices) {
-        amp->set_output_devices(amp, devices);
-    }
-
-    return 0;
-}
-
-static int amplifier_set_mode(audio_mode_t mode)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->set_mode)
-        return amp->set_mode(amp, mode);
-
-    return 0;
-}
-
-static int amplifier_output_stream_start(struct audio_stream_out *stream,
-        bool offload)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->output_stream_start)
-        return amp->output_stream_start(amp, stream, offload);
-
-    return 0;
-}
-
-static int amplifier_input_stream_start(struct audio_stream_in *stream)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->input_stream_start)
-        return amp->input_stream_start(amp, stream);
-
-    return 0;
-}
-
-static int amplifier_output_stream_standby(struct audio_stream_out *stream)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->output_stream_standby)
-        return amp->output_stream_standby(amp, stream);
-
-    return 0;
-}
-
-static int amplifier_input_stream_standby(struct audio_stream_in *stream)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp && amp->input_stream_standby)
-        return amp->input_stream_standby(amp, stream);
-
-    return 0;
-}
-
-static int amplifier_close(void)
-{
-    amplifier_device_t *amp = get_amplifier_device();
-    if (amp)
-        amplifier_device_close(amp);
-
-    return 0;
-}
-
 /** audio_stream_out implementation **/
 static uint32_t out_get_sample_rate(const struct audio_stream *stream)
 {
@@ -316,7 +203,6 @@ static int out_standby(struct audio_stream *stream)
 {
     struct qcom_stream_out *out =
         reinterpret_cast<struct qcom_stream_out *>(stream);
-    amplifier_output_stream_standby((struct audio_stream_out *)stream);
     return out->qcom_out->standby();
 }
 
@@ -386,10 +272,7 @@ static ssize_t out_write(struct audio_stream_out *stream, const void* buffer,
 {
     struct qcom_stream_out *out =
         reinterpret_cast<struct qcom_stream_out *>(stream);
-    ssize_t ret = out->qcom_out->write(buffer, bytes);
-    if (ret != 0)
-        amplifier_output_stream_start(stream, false);
-    return ret;
+    return out->qcom_out->write(buffer, bytes);
 }
 
 static int out_get_render_position(const struct audio_stream_out *stream,
@@ -531,7 +414,6 @@ static int in_set_format(struct audio_stream *stream, audio_format_t format)
 static int in_standby(struct audio_stream *stream)
 {
     struct qcom_stream_in *in = reinterpret_cast<struct qcom_stream_in *>(stream);
-    amplifier_input_stream_standby((struct audio_stream_in *)stream);
     return in->qcom_in->standby();
 }
 
@@ -594,10 +476,7 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer,
 {
     struct qcom_stream_in *in =
         reinterpret_cast<struct qcom_stream_in *>(stream);
-    ssize_t ret = in->qcom_in->read(buffer, bytes);
-    if (ret != 0)
-        amplifier_input_stream_start(stream);
-    return ret;
+    return in->qcom_in->read(buffer, bytes);
 }
 
 static uint32_t in_get_input_frames_lost(struct audio_stream_in *stream)
@@ -716,8 +595,10 @@ static int adev_set_mode(struct audio_hw_device *dev, audio_mode_t mode)
 {
     struct qcom_audio_device *qadev = to_ladev(dev);
 
+#ifdef USES_AUDIO_AMPLIFIER
     if (amplifier_set_mode(mode) != 0)
         ALOGE("Failed setting amplifier mode");
+#endif
 
     return qadev->hwif->setMode(mode);
 }
@@ -914,8 +795,10 @@ static int qcom_adev_close(hw_device_t* device)
                         reinterpret_cast<struct audio_hw_device *>(device);
     struct qcom_audio_device *qadev = to_ladev(hwdev);
 
+#ifdef USES_AUDIO_AMPLIFIER
     if (amplifier_close() != 0)
         ALOGE("Amplifier close failed");
+#endif
 
     if (!qadev)
         return 0;
@@ -961,9 +844,6 @@ static int qcom_adev_open(const hw_module_t* module, const char* name,
     qadev->device.close_input_stream = adev_close_input_stream;
     qadev->device.dump = adev_dump;
 
-    if (amplifier_open() != 0)
-        ALOGE("Amplifier initialization failed");
-
     qadev->hwif = createAudioHardware();
     if (!qadev->hwif) {
         ret = -EIO;
@@ -971,6 +851,11 @@ static int qcom_adev_open(const hw_module_t* module, const char* name,
     }
 
     *device = &qadev->device.common;
+
+#ifdef USES_AUDIO_AMPLIFIER
+    if (amplifier_open() != 0)
+        ALOGE("Amplifier initialization failed");
+#endif
 
     return 0;
 
