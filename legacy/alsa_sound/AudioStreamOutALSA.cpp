@@ -453,6 +453,11 @@ status_t AudioStreamOutALSA::getRenderPosition(uint32_t *dspFrames)
     return NO_ERROR;
 }
 
+status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timespec *timestamp)
+{
+    return INVALID_OPERATION;
+}
+
 status_t AudioStreamOutALSA::getPresentationPosition(uint64_t *frames, struct timespec *timestamp)
 {
     size_t avail = 0;
