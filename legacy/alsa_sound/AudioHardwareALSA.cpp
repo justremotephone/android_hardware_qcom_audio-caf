@@ -426,7 +426,7 @@ AudioHardwareALSA::AudioHardwareALSA() :
     }
 #endif
 
-    if (mUcMgr < 0) {
+    if (mUcMgr == NULL) {
         ALOGE("Failed to open ucm instance: %d", errno);
         mStatus = NO_INIT;
         return;

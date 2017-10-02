@@ -159,12 +159,12 @@ endif
 
 LOCAL_STATIC_LIBRARIES := \
     libmedia_helper \
-    libaudiohw_legacy \
-    libaudiopolicy_legacy \
+    libaudiohw_legacy
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
+    liblog \
     libmedia \
     libhardware \
     libc        \
@@ -238,8 +238,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_LIBRARIES := \
-    libmedia_helper \
-    libaudiopolicy_legacy
+    libmedia_helper
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
