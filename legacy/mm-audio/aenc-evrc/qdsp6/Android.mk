@@ -16,6 +16,7 @@ libOmxEvrcEnc-def += -D_DEBUG
 ifeq ($(strip $(TARGET_USES_QCOM_MM_AUDIO)),true)
 libOmxEvrcEnc-def += -DAUDIOV2
 endif
+libOmxEvrcEnc-def += -Wno-error
 
 # ---------------------------------------------------------------------------------
 #             Make the Shared library (libOmxEvrcEnc)

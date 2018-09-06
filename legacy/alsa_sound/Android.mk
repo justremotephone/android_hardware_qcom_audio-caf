@@ -8,6 +8,8 @@ ifeq ($(strip $(BOARD_USES_ALSA_AUDIO)),true)
 LOCAL_PATH := $(call my-dir)
 
 common_cflags := -D_POSIX_SOURCE
+common_cflags += -Wno-error
+
 ifneq ($(strip $(QCOM_ACDB_ENABLED)),false)
     common_cflags += -DQCOM_ACDB_ENABLED
 endif

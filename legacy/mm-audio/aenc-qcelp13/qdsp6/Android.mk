@@ -16,6 +16,7 @@ libOmxQcelp13Enc-def += -D_DEBUG
 ifeq ($(strip $(TARGET_USES_QCOM_MM_AUDIO)),true)
 libOmxQcelp13Enc-def += -DAUDIOV2
 endif
+libOmxQcelp13Enc-def += -Wno-error
 
 # ---------------------------------------------------------------------------------
 #             Make the Shared library (libOmxQcelp13Enc)
